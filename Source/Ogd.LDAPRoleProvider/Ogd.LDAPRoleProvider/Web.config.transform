@@ -8,14 +8,13 @@
     </connectionStrings>
     
     <system.web>
-        <roleManager enabled="true"
-                     defaultProvider="LDAPRoleProvider">
+        <roleManager>
             <providers>
-                <clear/>
                 <!--
                 Initially the connectionStringName is used, if you do not want to use the connectionStrings section, you can use the option connectionString
                 instead of connectionStringName. For instance:
                     <add name="LDAPRoleProvider"
+                         applicationName="/"
                          type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
                          domain="..."
                          connectionString="LDAP://..."
@@ -24,6 +23,7 @@
                 Secure connection protection is preferred. If you want to use a username/password, you'll have to use connectionProtection="None" and 
                 use the connectionUsername and connectionPassword options. For instance:
                     <add name="LDAPRoleProvider"
+                         applicationName="/"
                          type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
                          domain="..."
                          connectionStringName="LDAPConnectionString"
@@ -32,6 +32,7 @@
                          connectionPassword="password" />                
                 -->
                 <add name="LDAPRoleProvider"
+                     applicationName="/"
                      type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
                      domain="[your domain]"
                      connectionStringName="LDAPConnectionString"
