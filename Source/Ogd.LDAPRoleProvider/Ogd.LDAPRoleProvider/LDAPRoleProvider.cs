@@ -119,40 +119,27 @@ namespace Ogd.Web.Security
         public override void Initialize(string name, NameValueCollection config)
         {
             if (config == null)
+            {
                 throw new ArgumentNullException("config");
-
-            if (string.IsNullOrEmpty(name))
-                name = "LDAPRoleProvider";
-
-            if (string.IsNullOrEmpty(config["description"]))
-            {
-                config.Remove("description");
-                config.Add("description", "Active Directory Role Provider");
-            }
-
-            // Initialize the abstract base class.
-            base.Initialize(name, config);
-
-            Domain = ReadConfig(config, "domain");
-            IsAdditiveGroupMode = (ReadConfig(config, "groupMode") == "Additive");
-            string ldapConnectionStringName;
-            if (TryReadConfig(config, "connectionStringName", out ldapConnectionStringName))
-            {
-                LDAPConnectionString = ConfigurationManager.ConnectionStrings[ldapConnectionStringName].ConnectionString;
             }
             else
             {
-                LDAPConnectionString = ReadConfig(config, "connectionString");
-            }
-            ConnectionProtection = ReadConfig(config, "connectionProtection");
-            if (ConnectionProtection.Equals("None", StringComparison.InvariantCultureIgnoreCase))
-            {
-                ConnectionUsername = ReadConfig(config, "connectionUsername");
-                ConnectionPassword = ReadConfig(config, "connectionPassword");
-            }
 
-            DetermineApplicationName(config);
-            PopulateLists(config);
+                if (string.IsNullOrEmpty(name))
+                {
+                    name = "LDAPRoleProvider";
+                }
+                DetermineDescription(config);
+
+                // Initialize the abstract base class.
+                base.Initialize(name, config);
+                DetermineDomain(config);
+                DetermineGroupMode(config);
+                DetermineConnection(config);
+
+                DetermineApplicationName(config);
+                PopulateLists(config);
+            }
         }
 
         private string ReadConfig(NameValueCollection config, string key, bool required = true)
@@ -209,6 +196,52 @@ namespace Ogd.Web.Security
             if (ApplicationName.Length > 256)
             {
                 throw new ProviderException("The application name is too long.");
+            }
+        }
+
+        private void DetermineDomain(NameValueCollection config)
+        {
+
+            Domain = ReadConfig(config, "domain");
+        }
+
+        private void DetermineDescription(NameValueCollection config)
+        {
+            if (string.IsNullOrEmpty(config["description"]))
+            {
+                config.Remove("description");
+                config.Add("description", "Active Directory Role Provider");
+            }
+        }
+
+        private void DetermineConnection(NameValueCollection config)
+        {
+            GetConnectionString(config);
+            ConnectionProtection = ReadConfig(config, "connectionProtection");
+            if (ConnectionProtection.Equals("None", StringComparison.InvariantCultureIgnoreCase))
+            {
+                ConnectionUsername = ReadConfig(config, "connectionUsername");
+                ConnectionPassword = ReadConfig(config, "connectionPassword");
+            }
+        }
+
+        private void DetermineGroupMode(NameValueCollection config)
+        {
+            string groupMode;
+            TryReadConfig(config, "groupMode", out groupMode);
+            IsAdditiveGroupMode = (groupMode == "Additive");
+        }
+
+        private void GetConnectionString(NameValueCollection config)
+        {
+            string ldapConnectionStringName;
+            if (TryReadConfig(config, "connectionStringName", out ldapConnectionStringName))
+            {
+                LDAPConnectionString = ConfigurationManager.ConnectionStrings[ldapConnectionStringName].ConnectionString;
+            }
+            else
+            {
+                LDAPConnectionString = ReadConfig(config, "connectionString");
             }
         }
 

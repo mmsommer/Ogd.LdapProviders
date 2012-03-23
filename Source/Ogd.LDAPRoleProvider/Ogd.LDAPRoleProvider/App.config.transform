@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+
+<configuration>
+    <connectionStrings>
+        <!-- Change the connectionString to your LDAP connection. For instance: "LDAP://.../OU=...,DC=.." -->
+        <add name="LDAPConnectionString"
+             connectionString="[your LDAP connection string]" />
+    </connectionStrings>
+    
+    <system.web>
+        <roleManager enabled="true"
+                     defaultProvider="LDAPRoleProvider">
+            <providers>
+                <clear/>
+                <!--
+                Initially the connectionStringName is used, if you do not want to use the connectionStrings section, you can use the option connectionString
+                instead of connectionStringName. For instance:
+                    <add name="LDAPRoleProvider"
+                         type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
+                         domain="..."
+                         connectionString="LDAP://..."
+                         connectionProtection="Secure" /> 
+                         
+                Secure connection protection is preferred. If you want to use a username/password, you'll have to use connectionProtection="None" and 
+                use the connectionUsername and connectionPassword options. For instance:
+                    <add name="LDAPRoleProvider"
+                         type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
+                         domain="..."
+                         connectionStringName="LDAPConnectionString"
+                         connectionProtection="None"
+                         connectionUsername="username"
+                         connectionPassword="password" />                
+                -->
+                <add name="LDAPRoleProvider"
+                     type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
+                     domain="[your domain]"
+                     connectionStringName="LDAPConnectionString"
+                     connectionProtection="Secure" />
+            </providers>
+        </roleManager>
+    </system.web>
+</configuration>
