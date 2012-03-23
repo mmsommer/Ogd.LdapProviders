@@ -18,21 +18,21 @@ namespace Ogd.Web.Security
         private const string ADFilter = "(&(objectCategory=group)(|(groupType=-2147483646)(groupType=-2147483644)(groupType=-2147483640)))";
         private const string ADField = "samAccountName";
 
-        private string LDAPConnectionString;
-        private string Domain;
-        private string ConnectionUsername;
-        private string ConnectionPassword;
-        private string ConnectionProtection;
+        private string LDAPConnectionString { get; set; }
+        private string Domain { get; set; }
+        private string ConnectionUsername { get; set; }
+        private string ConnectionPassword { get; set; }
+        private string ConnectionProtection { get; set; }
 
         // Retrieve Group Mode
         // "Additive" indicates that only the groups specified in groupsToUse will be used
         // "Subtractive" indicates that all Active Directory groups will be used except those specified in groupsToIgnore
         // "Additive" is somewhat more secure, but requires more maintenance when groups change
-        private bool IsAdditiveGroupMode;
+        private bool IsAdditiveGroupMode { get; set; }
 
-        private List<string> GroupsToUse;
-        private List<string> GroupsToIgnore;
-        private List<string> UsersToIgnore;
+        private List<string> GroupsToUse { get; set; }
+        private List<string> GroupsToIgnore { get; set; }
+        private List<string> UsersToIgnore { get; set; }
 
         #region Ignore Lists
 
@@ -135,11 +135,12 @@ namespace Ogd.Web.Security
 
             Domain = ReadConfig(config, "domain");
             IsAdditiveGroupMode = (ReadConfig(config, "groupMode") == "Additive");
-            try
+            string ldapConnectionStringName;
+            if (TryReadConfig(config, "connectionStringName", out ldapConnectionStringName))
             {
-                LDAPConnectionString = ConfigurationManager.ConnectionStrings[ReadConfig(config, "connectionStringName")].ConnectionString;
+                LDAPConnectionString = ConfigurationManager.ConnectionStrings[ldapConnectionStringName].ConnectionString;
             }
-            catch (ProviderException)
+            else
             {
                 LDAPConnectionString = ReadConfig(config, "connectionString");
             }
@@ -156,25 +157,40 @@ namespace Ogd.Web.Security
 
         private string ReadConfig(NameValueCollection config, string key, bool required = true)
         {
-            if (config.AllKeys.Any(k => k == key))
+            string value;
+            if (TryReadConfig(config, key, out  value) || !required)
             {
-                return config[key];
+                return value;
             }
             else
             {
-                if (required)
-                {
-                    throw new ProviderException("Configuration value required for key: " + key);
-                }
-                return "";
+                throw new ProviderException("Configuration value required for key: " + key);
+            }
+        }
+
+        private bool TryReadConfig(NameValueCollection config, string key, out string value)
+        {
+            if (config.AllKeys.Any(k => k == key))
+            {
+                value = config[key];
+                return true;
+            }
+            else
+            {
+                value = "";
+                return false;
             }
         }
 
         private void DetermineApplicationName(NameValueCollection config)
         {
             // Retrieve Application Name
-            ApplicationName = config["applicationName"];
-            if (string.IsNullOrEmpty(ApplicationName))
+            string applicationName;
+            if (TryReadConfig(config, "applicationName", out applicationName))
+            {
+                ApplicationName = applicationName;
+            }
+            else
             {
                 try
                 {
@@ -191,28 +207,38 @@ namespace Ogd.Web.Security
             }
 
             if (ApplicationName.Length > 256)
+            {
                 throw new ProviderException("The application name is too long.");
+            }
         }
 
         private void PopulateLists(NameValueCollection config)
         {
             // If Additive group mode, populate GroupsToUse with specified AD groups
-            if (IsAdditiveGroupMode && !string.IsNullOrEmpty(config["groupsToUse"]))
+            string groupsToUse;
+            if (IsAdditiveGroupMode && TryReadConfig(config, "groupsToUse", out groupsToUse))
+            {
                 GroupsToUse.AddRange(
-                    config["groupsToUse"].Split(',').Select(group => group.Trim())
+                    groupsToUse.Split(',').Select(group => group.Trim())
                 );
+            }
 
             // Populate GroupsToIgnore List<string> with AD groups that should be ignored for roles purposes
             GroupsToIgnore.AddRange(
                 DefaultGroupsToIgnore.Select(group => group.Trim())
             );
 
+            string groupsToIgnore;
+            TryReadConfig(config, "groupsToIgnore", out groupsToIgnore);
             GroupsToIgnore.AddRange(
-                (config["groupsToIgnore"] ?? "").Split(',').Select(group => group.Trim())
+                groupsToIgnore
+                    .Split(',')
+                    .Select(group => group.Trim())
             );
 
             // Populate UsersToIgnore ArrayList with AD users that should be ignored for roles purposes
-            string usersToIgnore = config["usersToIgnore"] ?? "";
+            string usersToIgnore;
+            TryReadConfig(config, "usersToIgnore", out usersToIgnore);
             UsersToIgnore.AddRange(
                 DefaultUsersToIgnore
                     .Select(value => value.Trim())
@@ -233,13 +259,13 @@ namespace Ogd.Web.Security
 
             List<string> res = principal
                 .GetGroups()
-                .ToList()
-                .Select(grp => grp.Name)
-                .ToList();
+                .Select(grp => grp.Name).ToList();
 
             groups.AddRange(res.Except(groups));
             foreach (var item in res)
+            {
                 RecurseGroup(context, item, groups);
+            }
         }
 
         /// <summary>
@@ -252,10 +278,11 @@ namespace Ogd.Web.Security
             string sessionKey = "groupsForUser:" + username;
 
             if (HttpContext.Current != null &&
-                 HttpContext.Current.Session != null &&
-                 HttpContext.Current.Session[sessionKey] != null
-            )
+                HttpContext.Current.Session != null &&
+                HttpContext.Current.Session[sessionKey] != null)
+            {
                 return ((List<string>)(HttpContext.Current.Session[sessionKey])).ToArray();
+            }
 
             using (PrincipalContext context = new PrincipalContext(ContextType.Domain, Domain))
             {
@@ -263,22 +290,30 @@ namespace Ogd.Web.Security
                 {
                     // add the users groups to the result
                     var groupList = UserPrincipal
-                            .FindByIdentity(context, IdentityType.SamAccountName, username)
-                            .GetGroups()
-                            .Select(group => group.Name)
-                            .ToList();
+                        .FindByIdentity(context, IdentityType.SamAccountName, username)
+                        .GetGroups()
+                        .Select(group => group.Name)
+                        .ToList();
 
                     // add each groups sub groups into the groupList
                     foreach (var group in new List<string>(groupList))
+                    {
                         RecurseGroup(context, group, groupList);
+                    }
 
-                    groupList = groupList.Except(GroupsToIgnore).ToList();
+                    groupList = groupList
+                        .Except(GroupsToIgnore)
+                        .ToList();
 
                     if (IsAdditiveGroupMode)
+                    {
                         groupList = groupList.Join(GroupsToUse, r => r, g => g, (r, g) => r).ToList();
+                    }
 
                     if (HttpContext.Current != null)
+                    {
                         HttpContext.Current.Session[sessionKey] = groupList;
+                    }
 
                     return groupList.ToArray();
                 }
@@ -298,19 +333,20 @@ namespace Ogd.Web.Security
         public override string[] GetUsersInRole(String rolename)
         {
             if (!RoleExists(rolename))
+            {
                 throw new ProviderException(String.Format("The role '{0}' was not found.", rolename));
+            }
 
-            using (PrincipalContext context = new PrincipalContext(ContextType.Domain, Domain))
+            using (var context = new PrincipalContext(ContextType.Domain, Domain))
             {
                 try
                 {
-                    GroupPrincipal p = GroupPrincipal.FindByIdentity(context, IdentityType.SamAccountName, rolename);
+                    var groupPrincipal = GroupPrincipal.FindByIdentity(context, IdentityType.SamAccountName, rolename);
 
-                    return (
-                        from user in p.GetMembers(true)
-                        where !UsersToIgnore.Contains(user.SamAccountName)
-                        select user.SamAccountName
-                    ).ToArray();
+                    return groupPrincipal.GetMembers(true)
+                        .Where(user => !UsersToIgnore.Contains(user.SamAccountName))
+                        .Select(user => user.SamAccountName)
+                        .ToArray();
                 }
                 catch (Exception ex)
                 {
@@ -339,11 +375,9 @@ namespace Ogd.Web.Security
         {
             string[] roles = ADSearch(LDAPConnectionString, ADFilter, ADField);
 
-            return (
-                from role in roles.Except(GroupsToIgnore)
-                where !IsAdditiveGroupMode || GroupsToUse.Contains(role)
-                select role
-            ).ToArray();
+            return roles.Except(GroupsToIgnore)
+                .Where(role => !IsAdditiveGroupMode || GroupsToUse.Contains(role))
+                .ToArray();
         }
 
         /// <summary>
@@ -365,13 +399,15 @@ namespace Ogd.Web.Security
         public override string[] FindUsersInRole(string rolename, string usernameToMatch)
         {
             if (!RoleExists(rolename))
+            {
                 throw new ProviderException(String.Format("The role '{0}' was not found.", rolename));
-
-            return (
-                from user in GetUsersInRole(rolename)
-                where user.ToLower().Contains(usernameToMatch.ToLower())
-                select user
-            ).ToArray();
+            }
+            else
+            {
+                return GetUsersInRole(rolename)
+                    .Where(user => user.ToLowerInvariant().Contains(usernameToMatch.ToLowerInvariant()))
+                    .ToArray();
+            }
         }
 
         #region Non Supported Base Class Functions
@@ -407,6 +443,7 @@ namespace Ogd.Web.Security
         {
             throw new NotSupportedException("Unable to remove users from roles.  For security and management purposes, LDAPRoleProvider only supports read operations against Active Direcory.");
         }
+
         #endregion
 
         /// <summary>
@@ -417,7 +454,7 @@ namespace Ogd.Web.Security
         /// <param name="filter">LDAP format search filter</param>
         /// <param name="field">AD field to return</param>
         /// <returns>String array containing values specified by 'field' parameter</returns>
-        private String[] ADSearch(String ConnectionString, String filter, string field)
+        private string[] ADSearch(string ConnectionString, string filter, string field)
         {
             DirectoryEntry directoryEntry;
             if (ConnectionProtection.Equals("None", StringComparison.InvariantCultureIgnoreCase))
@@ -428,7 +465,7 @@ namespace Ogd.Web.Security
             {
                 directoryEntry = new DirectoryEntry(ConnectionString);
             }
-            DirectorySearcher searcher = new DirectorySearcher {
+            var searcher = new DirectorySearcher {
                 SearchRoot = directoryEntry,
                 Filter = filter,
                 PageSize = 500
@@ -438,14 +475,16 @@ namespace Ogd.Web.Security
 
             try
             {
-                using (SearchResultCollection results = searcher.FindAll())
+                using (var results = searcher.FindAll())
                 {
                     List<string> r = new List<string>();
                     foreach (SearchResult searchResult in results)
                     {
                         var prop = searchResult.Properties[field];
                         for (int index = 0; index < prop.Count; index++)
+                        {
                             r.Add(prop[index].ToString());
+                        }
                     }
 
                     return r.Count > 0 ? r.ToArray() : new string[0];
