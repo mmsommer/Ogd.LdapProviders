@@ -15,7 +15,7 @@
                 instead of connectionStringName. For instance:
                     <add name="LDAPRoleProvider"
                          applicationName="/"
-                         type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
+                         type="Ogd.Web.Security.LDAPRoleProvider, Ogd.LDAPRoleProvider"
                          domain="..."
                          connectionString="LDAP://..."
                          connectionProtection="Secure" /> 
@@ -24,7 +24,7 @@
                 use the connectionUsername and connectionPassword options. For instance:
                     <add name="LDAPRoleProvider"
                          applicationName="/"
-                         type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
+                         type="Ogd.Web.Security.LDAPRoleProvider, Ogd.LDAPRoleProvider"
                          domain="..."
                          connectionStringName="LDAPConnectionString"
                          connectionProtection="None"
@@ -33,7 +33,7 @@
                 -->
                 <add name="LDAPRoleProvider"
                      applicationName="/"
-                     type="Ogd.Web.Security.ADRoleProvider, Ogd.LDAPRoleProvider"
+                     type="Ogd.Web.Security.LDAPRoleProvider, Ogd.LDAPRoleProvider"
                      domain="[your domain]"
                      connectionStringName="LDAPConnectionString"
                      connectionProtection="Secure" />
