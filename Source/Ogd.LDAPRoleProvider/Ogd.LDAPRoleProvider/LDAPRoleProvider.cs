@@ -397,7 +397,24 @@ namespace Ogd.Web.Security
         /// <returns>Boolean indicating membership</returns>
         public override bool IsUserInRole(string username, string rolename)
         {
-            return GetUsersInRole(rolename).Any(user => user == username);
+            if (!RoleExists(rolename))
+            {
+                throw new ProviderException(String.Format("The role '{0}' was not found.", rolename));
+            }
+
+            using (var context = new PrincipalContext(ContextType.Domain, Domain))
+            {
+                try
+                {
+                    var principal = Principal.FindByIdentity(context, IdentityType.SamAccountName, username);
+                    return principal.GetGroups(context).Any(x => x.SamAccountName == rolename);
+                }
+                catch (Exception ex)
+                {
+                    Elmah.ErrorLog.GetDefault(HttpContext.Current).Log(new Elmah.Error(ex, HttpContext.Current));
+                    return false;
+                }
+            }
         }
 
         /// <summary>
