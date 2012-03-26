@@ -365,11 +365,6 @@ namespace Ogd.Web.Security
         /// <returns></returns>
         public override string[] GetUsersInRole(String rolename)
         {
-            if (!RoleExists(rolename))
-            {
-                throw new ProviderException(String.Format("The role '{0}' was not found.", rolename));
-            }
-
             using (var context = new PrincipalContext(ContextType.Domain, Domain))
             {
                 try
@@ -397,17 +392,12 @@ namespace Ogd.Web.Security
         /// <returns>Boolean indicating membership</returns>
         public override bool IsUserInRole(string username, string rolename)
         {
-            if (!RoleExists(rolename))
-            {
-                throw new ProviderException(String.Format("The role '{0}' was not found.", rolename));
-            }
-
             using (var context = new PrincipalContext(ContextType.Domain, Domain))
             {
                 try
                 {
                     var principal = Principal.FindByIdentity(context, IdentityType.SamAccountName, username);
-                    return principal.GetGroups(context).Any(x => x.SamAccountName == rolename);
+                    return principal.GetGroups().Any(x => x.SamAccountName.Equals(rolename, StringComparison.InvariantCultureIgnoreCase));
                 }
                 catch (Exception ex)
                 {
