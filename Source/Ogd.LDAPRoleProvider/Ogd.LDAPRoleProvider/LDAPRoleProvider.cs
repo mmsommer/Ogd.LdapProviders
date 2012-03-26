@@ -201,7 +201,6 @@ namespace Ogd.Web.Security
 
         private void DetermineDomain(NameValueCollection config)
         {
-
             Domain = ReadConfig(config, "domain");
         }
 
