@@ -24,14 +24,13 @@ namespace Ogd.Web.Security
             else
             {
                 base.Initialize(name, config);
-                LdapProvider.DetermineDomain(config);
                 LdapProvider.DetermineConnection(config);
             }
         }
 
         public string GetDisplayName(string username)
         {
-            using (var context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
+            using (var context = new PrincipalContext(ContextType.Domain))
             {
                 try
                 {

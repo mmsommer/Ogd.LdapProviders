@@ -10,7 +10,6 @@ namespace Ogd.Web.Security
     public class LdapProvider
     {
         internal string LdapConnectionString { get; set; }
-        internal string Domain { get; set; }
         internal string ConnectionUsername { get; set; }
         internal string ConnectionPassword { get; set; }
         internal string ConnectionProtection { get; set; }
@@ -40,11 +39,6 @@ namespace Ogd.Web.Security
                 value = "";
                 return false;
             }
-        }
-
-        internal void DetermineDomain(NameValueCollection config)
-        {
-            Domain = ReadConfig(config, "domain");
         }
 
         internal void DetermineConnection(NameValueCollection config)

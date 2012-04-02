@@ -15,6 +15,7 @@ namespace Ogd.Web.Security
     public class LdapRoleProvider : RoleProvider
     {
         private LdapProvider LdapProvider { get; set; }
+        private string Domain { get; set; }
 
         private const string ADFilter = "(&(objectCategory=group)(|(groupType=-2147483646)(groupType=-2147483644)(groupType=-2147483640)))";
         private const string ADField = "samAccountName";
@@ -130,9 +131,9 @@ namespace Ogd.Web.Security
                 base.Initialize(name, config);
 
                 // Setting up the LDAPProvider
-                LdapProvider.DetermineDomain(config);
                 LdapProvider.DetermineConnection(config);
 
+                DetermineDomain(config);
                 DetermineGroupMode(config);
                 DetermineApplicationName(config);
                 PopulateLists(config);
@@ -193,6 +194,11 @@ namespace Ogd.Web.Security
             string groupMode;
             TryReadConfig(config, "groupMode", out groupMode);
             IsAdditiveGroupMode = (groupMode == "Additive");
+        }
+
+        private void DetermineDomain(NameValueCollection config)
+        {
+            Domain = ReadConfig(config, "domain");
         }
 
         private void PopulateLists(NameValueCollection config)
@@ -267,7 +273,7 @@ namespace Ogd.Web.Security
                 return ((List<string>)(HttpContext.Current.Session[sessionKey])).ToArray();
             }
 
-            using (PrincipalContext context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
+            using (PrincipalContext context = new PrincipalContext(ContextType.Domain, Domain))
             {
                 try
                 {
@@ -315,7 +321,7 @@ namespace Ogd.Web.Security
         /// <returns></returns>
         public override string[] GetUsersInRole(String rolename)
         {
-            using (var context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
+            using (var context = new PrincipalContext(ContextType.Domain, Domain))
             {
                 try
                 {
@@ -342,7 +348,7 @@ namespace Ogd.Web.Security
         /// <returns>Boolean indicating membership</returns>
         public override bool IsUserInRole(string username, string rolename)
         {
-            using (var context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
+            using (var context = new PrincipalContext(ContextType.Domain, Domain))
             {
                 try
                 {
