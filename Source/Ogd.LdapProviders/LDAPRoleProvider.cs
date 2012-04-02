@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Configuration;
 using System.Configuration.Provider;
 using System.Diagnostics;
 using System.DirectoryServices;
@@ -13,16 +12,12 @@ using System.Web.Security;
 
 namespace Ogd.Web.Security
 {
-    public class LDAPRoleProvider : RoleProvider
+    public class LdapRoleProvider : RoleProvider
     {
+        private LdapProvider LdapProvider { get; set; }
+
         private const string ADFilter = "(&(objectCategory=group)(|(groupType=-2147483646)(groupType=-2147483644)(groupType=-2147483640)))";
         private const string ADField = "samAccountName";
-
-        private string LDAPConnectionString { get; set; }
-        private string Domain { get; set; }
-        private string ConnectionUsername { get; set; }
-        private string ConnectionPassword { get; set; }
-        private string ConnectionProtection { get; set; }
 
         // Retrieve Group Mode
         // "Additive" indicates that only the groups specified in groupsToUse will be used
@@ -102,8 +97,9 @@ namespace Ogd.Web.Security
         /// <summary>
         /// Initializes a new instance of the LDAPRoleProvider class.
         /// </summary>
-        public LDAPRoleProvider()
+        public LdapRoleProvider()
         {
+            LdapProvider = new LdapProvider();
             GroupsToUse = new List<string>();
             GroupsToIgnore = new List<string>();
             UsersToIgnore = new List<string>();
@@ -124,7 +120,6 @@ namespace Ogd.Web.Security
             }
             else
             {
-
                 if (string.IsNullOrEmpty(name))
                 {
                     name = "LDAPRoleProvider";
@@ -133,10 +128,12 @@ namespace Ogd.Web.Security
 
                 // Initialize the abstract base class.
                 base.Initialize(name, config);
-                DetermineDomain(config);
-                DetermineGroupMode(config);
-                DetermineConnection(config);
 
+                // Setting up the LDAPProvider
+                LdapProvider.DetermineDomain(config);
+                LdapProvider.DetermineConnection(config);
+
+                DetermineGroupMode(config);
                 DetermineApplicationName(config);
                 PopulateLists(config);
             }
@@ -144,29 +141,12 @@ namespace Ogd.Web.Security
 
         private string ReadConfig(NameValueCollection config, string key, bool required = true)
         {
-            string value;
-            if (TryReadConfig(config, key, out  value) || !required)
-            {
-                return value;
-            }
-            else
-            {
-                throw new ProviderException("Configuration value required for key: " + key);
-            }
+            return LdapProvider.ReadConfig(config, key, required);
         }
 
         private bool TryReadConfig(NameValueCollection config, string key, out string value)
         {
-            if (config.AllKeys.Any(k => k == key))
-            {
-                value = config[key];
-                return true;
-            }
-            else
-            {
-                value = "";
-                return false;
-            }
+            return LdapProvider.TryReadConfig(config, key, out value);
         }
 
         private void DetermineApplicationName(NameValueCollection config)
@@ -199,11 +179,6 @@ namespace Ogd.Web.Security
             }
         }
 
-        private void DetermineDomain(NameValueCollection config)
-        {
-            Domain = ReadConfig(config, "domain");
-        }
-
         private void DetermineDescription(NameValueCollection config)
         {
             if (string.IsNullOrEmpty(config["description"]))
@@ -213,35 +188,11 @@ namespace Ogd.Web.Security
             }
         }
 
-        private void DetermineConnection(NameValueCollection config)
-        {
-            GetConnectionString(config);
-            ConnectionProtection = ReadConfig(config, "connectionProtection");
-            if (ConnectionProtection.Equals("None", StringComparison.InvariantCultureIgnoreCase))
-            {
-                ConnectionUsername = ReadConfig(config, "connectionUsername");
-                ConnectionPassword = ReadConfig(config, "connectionPassword");
-            }
-        }
-
         private void DetermineGroupMode(NameValueCollection config)
         {
             string groupMode;
             TryReadConfig(config, "groupMode", out groupMode);
             IsAdditiveGroupMode = (groupMode == "Additive");
-        }
-
-        private void GetConnectionString(NameValueCollection config)
-        {
-            string ldapConnectionStringName;
-            if (TryReadConfig(config, "connectionStringName", out ldapConnectionStringName))
-            {
-                LDAPConnectionString = ConfigurationManager.ConnectionStrings[ldapConnectionStringName].ConnectionString;
-            }
-            else
-            {
-                LDAPConnectionString = ReadConfig(config, "connectionString");
-            }
         }
 
         private void PopulateLists(NameValueCollection config)
@@ -316,7 +267,7 @@ namespace Ogd.Web.Security
                 return ((List<string>)(HttpContext.Current.Session[sessionKey])).ToArray();
             }
 
-            using (PrincipalContext context = new PrincipalContext(ContextType.Domain, Domain))
+            using (PrincipalContext context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
             {
                 try
                 {
@@ -364,7 +315,7 @@ namespace Ogd.Web.Security
         /// <returns></returns>
         public override string[] GetUsersInRole(String rolename)
         {
-            using (var context = new PrincipalContext(ContextType.Domain, Domain))
+            using (var context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
             {
                 try
                 {
@@ -391,12 +342,12 @@ namespace Ogd.Web.Security
         /// <returns>Boolean indicating membership</returns>
         public override bool IsUserInRole(string username, string rolename)
         {
-            using (var context = new PrincipalContext(ContextType.Domain, Domain))
+            using (var context = new PrincipalContext(ContextType.Domain, LdapProvider.Domain))
             {
                 try
                 {
-                    var principal = Principal.FindByIdentity(context, IdentityType.SamAccountName, username);
-                    return principal.GetGroups().Any(x => x.SamAccountName.Equals(rolename, StringComparison.InvariantCultureIgnoreCase));
+                    var principal = UserPrincipal.FindByIdentity(context, IdentityType.SamAccountName, username);
+                    return principal.GetAuthorizationGroups().Any(x => x.SamAccountName.Equals(rolename, StringComparison.InvariantCultureIgnoreCase));
                 }
                 catch (Exception ex)
                 {
@@ -412,7 +363,7 @@ namespace Ogd.Web.Security
         /// <returns>String array of roles</returns>
         public override string[] GetAllRoles()
         {
-            string[] roles = ADSearch(LDAPConnectionString, ADFilter, ADField);
+            string[] roles = ADSearch(ADFilter, ADField);
 
             return roles.Except(GroupsToIgnore)
                 .Where(role => !IsAdditiveGroupMode || GroupsToUse.Contains(role))
@@ -493,17 +444,9 @@ namespace Ogd.Web.Security
         /// <param name="filter">LDAP format search filter</param>
         /// <param name="field">AD field to return</param>
         /// <returns>String array containing values specified by 'field' parameter</returns>
-        private string[] ADSearch(string ConnectionString, string filter, string field)
+        private string[] ADSearch(string filter, string field)
         {
-            DirectoryEntry directoryEntry;
-            if (ConnectionProtection.Equals("None", StringComparison.InvariantCultureIgnoreCase))
-            {
-                directoryEntry = new DirectoryEntry(ConnectionString, ConnectionUsername, ConnectionPassword);
-            }
-            else
-            {
-                directoryEntry = new DirectoryEntry(ConnectionString);
-            }
+            var directoryEntry = LdapProvider.GetDirectoryEntry();
             var searcher = new DirectorySearcher {
                 SearchRoot = directoryEntry,
                 Filter = filter,
