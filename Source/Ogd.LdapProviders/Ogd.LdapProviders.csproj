@@ -46,7 +46,7 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="LdapMembershipProvider.cs" />
+    <Compile Include="LdapMembershipProviderExtensions.cs" />
     <Compile Include="LdapRoleProvider.cs" />
     <Compile Include="LdapProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
