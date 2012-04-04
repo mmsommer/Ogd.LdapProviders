@@ -315,6 +315,31 @@ namespace Ogd.Web.Security
         }
 
         /// <summary>
+        /// Retrieve listing of all users with their displaynames in the the Users role.
+        /// </summary>
+        /// <returns></returns>
+        public string[][] GetUserDisplayNames()
+        {
+            using (var context = new PrincipalContext(ContextType.Domain, Domain))
+            {
+                try
+                {
+                    var groupPrincipal = GroupPrincipal.FindByIdentity(context, IdentityType.SamAccountName, "Users");
+
+                    return groupPrincipal.GetMembers(true)
+                        .Where(user => !UsersToIgnore.Contains(user.SamAccountName))
+                        .Select(user => new[] { user.SamAccountName, user.DisplayName })
+                        .ToArray();
+                }
+                catch (Exception ex)
+                {
+                    Elmah.ErrorLog.GetDefault(HttpContext.Current).Log(new Elmah.Error(ex, HttpContext.Current));
+                    return new string[0][];
+                }
+            }
+        }
+
+        /// <summary>
         /// Retrieve listing of all users in a specified role.
         /// </summary>
         /// <param name="rolename">String array of users</param>
@@ -336,6 +361,32 @@ namespace Ogd.Web.Security
                 {
                     Elmah.ErrorLog.GetDefault(HttpContext.Current).Log(new Elmah.Error(ex, HttpContext.Current));
                     return new[] { "" };
+                }
+            }
+        }
+
+        /// <summary>
+        /// Retrieve listing of all users with their displaynames in a specified role.
+        /// </summary>
+        /// <param name="rolename">String array of users</param>
+        /// <returns></returns>
+        public string[][] GetUserDisplayNamesInRole(string rolename)
+        {
+            using (var context = new PrincipalContext(ContextType.Domain, Domain))
+            {
+                try
+                {
+                    var groupPrincipal = GroupPrincipal.FindByIdentity(context, IdentityType.SamAccountName, rolename);
+
+                    return groupPrincipal.GetMembers(true)
+                        .Where(user => !UsersToIgnore.Contains(user.SamAccountName))
+                        .Select(user => new[] { user.SamAccountName, user.DisplayName })
+                        .ToArray();
+                }
+                catch (Exception ex)
+                {
+                    Elmah.ErrorLog.GetDefault(HttpContext.Current).Log(new Elmah.Error(ex, HttpContext.Current));
+                    return new string[0][];
                 }
             }
         }
